@@ -1,4 +1,5 @@
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
+import numpy as np
 """
 On se place directement entre t_0 et t_f.
 Alors N correspond à l'échantillonage entre les deux.
@@ -11,12 +12,20 @@ Qi = 0.0
 t_f = 10.0
 t_i = 0.0
 P_max = 500.0
+P_0 = [(Qf-Qi)/(t_f - t_i) * U/N]*N
+W_0 = list(range(0, 2*N + 1))
+In_plus = [[0 if x!=k else 1 for x in range(N)] for k in range(N)]
+In_moins = [[0 if x!=k else -1 for x in range(N)] for k in range(N)]
+A = np.array([[-(t_f - t_i)/(N*U)]*N] + In_moins + In_plus)
 
 def fun(x):
     return np.dot(c, x)
 
 def grad_fun(x):
     return c
+
+def grad_c(x):
+    return A.T
 
 def cont(x):
     c1 = [(Qf - Qi) - (t_f - t_i)*sum(y for y in x)/(N * U)]
@@ -30,16 +39,21 @@ def test_min(lamb):
             return False
     return True
 
-def contraintesactivesoQP(xk, alpha = 0.01, lamb=[0]*(2*N + 1), W=list(range(0, 2*N + 1))):
+def contraintesactivesOQP(xk=P_0, lamb=[0]*(2*N + 1), W=W_0):
     """
     On implémente l'algorithme des contraintes actives QP.
     On est ici avec G=0, f(x)=x*c, c(x)=Ax-b
     où A=(-T/NU ... -T/NU) et b=(Qi - Qf)
          (     -In       )      (   0   )
          (      In       )      (  Pmax )
+    Dans l'étape (a) on cherche une direction pour la recherche.
+    On la choisit aléatoirement.
+    Elle est telle que A*p=0, ce qui est garanti par notre choix simple.
+    Elle minimise c*p.
     """
     while not test_min(lamb):
         # (a) direction pk
+        pk = [0]*N
         indice = []
         for i in W:
             if 0 < i <= N:
@@ -53,12 +67,28 @@ def contraintesactivesoQP(xk, alpha = 0.01, lamb=[0]*(2*N + 1), W=list(range(0, 
             y1 = liste.pop(i1)
             i2 = random.randint(len(liste))
             y2 = liste.pop(i2)
-            pk = [0]*N
             pk[y1], pk[y2] = c[y2], -c[y1]
-        # (b)
-        c_k = cont(xk)
-        for i in range(2*N + 1):
-            if lamb[i] != None:
-                lamb[i] = min(0, lamb[i] + alpha*c_k[i])
-
+            # (b) pk != 0
+            # légitime car coût non nul à tout instant
+            swap = [1] + [None]*(2*N + 1)
+            if not 0 in W and pk[y1] + pk[y2] < 0:
+                z = (Qi - Qf + (t_f - t_i)*sum(y for y in xk)/(N * U))
+                swap[1] = (-z/(t_f - t_i)*(pk[y1] + pk[y2])/(N * U))
+            for i in range(N+1):
+                if not i in W and pk[i-1] < 0:
+                    swap[i+1] = (-xk[i-1]/pk[i-1])
+                if not (i+N) in W and pk[i+N-1] > 0:
+                    swap[i+1] = (xk[i-1]/pk[i-1])
+            alphak = min(x for x in swap if x != None)
+            xk = xk + alphak * pk
+            if alphak < 1:
+                j = 0
+                while swap[j] != alphak:
+                    j += 1
+                W.append(j)
+        # (c) pk = 0
+        def grad_lag_xk(xk):
+            return grad_fun(xk) + np.dot(A, lambdak)
+        lambdak = grad_fix_step(grad_lag_xk, )
+        ##
     return xk
