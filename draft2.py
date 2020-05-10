@@ -30,8 +30,11 @@ def funi(x):
 def grad_funi(x):
     return c
 
-def grad_ci(x):
-    return A.T
+def grad_c1(x):
+    return A1.T
+
+def grad_c2(x):
+    return A2.T
 
 def cont1(x):
     c1 = [(Qf1 - Qi1) - (tf1 - ti1)*sum(y for y in x)/(N * U)]
@@ -52,10 +55,12 @@ def uzawa(xk1, xk2, grad_f1, grad_f2, grad_l1, grad_l2, c1, c2):
     # 2 Décomposition
     def decomp(xk, lk, grad_f, grad_c, alpha=1e-2, maxit=1e3, eps=1e-8):
         i = 0
-        grad_l_xk = grad_l(xk, lk)
+        grad_l_xk = grad_f(xk, lk) + np.dot(grad_c(xk, lk), lk)
         while (i < maxit) and (np.linalg.norm(grad_l_xk > eps)):
             i += 1
             grad_l_xk = grad_f(xk, lk) + np.dot(grad_c(xk, lk), lk)
             xk = xk - alpha*grad_l_xk
         return xk
-    x1 = decomp(x1, lambdak[0:2*N+1], )
+    x1 = decomp(x1, lambdak[0:2*N+1], grad_funi, grad_c1)
+    x2 = decomp(x2, lambdak[2*N+1:], grad_funi, grad_c2)
+    # 3 Coordina
