@@ -3,15 +3,22 @@ import numpy as np
 import random
 import math
 import time
+
 """
 On se place directement entre t_0 et t_f.
 Alors N correspond à l'échantillonage entre les deux.
 """
-N = 100
-U = 230.0
+
+
 #c = np.array([1.0 for _ in range(N)]) # coût constant
 #c = np.array([2.0*(math.cos(i) + 1.1) for i in range(N)]) # coût oscillant
 c = np.array([(2.0*(i%3) + 1.0) for i in range(N)]) # coût "triangulaire"
+
+
+N = 100
+
+
+U = 230.0
 Qf = 15.0
 Qi = 0.0
 t_f = 10.0
@@ -23,6 +30,7 @@ In_plus = [[0 if x!=k else 1 for x in range(N)] for k in range(N)]
 In_moins = [[0 if x!=k else -1 for x in range(N)] for k in range(N)]
 A = np.array([[-(t_f - t_i)/(N*U)]*N] + In_moins + In_plus)
 cst_pk = 0.1
+
 
 def fun(x):
     return np.dot(c, x)
@@ -44,6 +52,7 @@ def test_min(lamb):
         if l!=None and l <= 0.0:
             return False
     return True
+
 
 def contraintesactivesOQP(c, xk=P_0, lambdak=np.array([0.0]*(2*N + 1)), W=W_0):
     debut = time.time()
