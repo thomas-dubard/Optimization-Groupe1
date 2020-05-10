@@ -87,8 +87,14 @@ def contraintesactivesOQP(xk=P_0, lamb=[0]*(2*N + 1), W=W_0):
                     j += 1
                 W.append(j)
         # (c) pk = 0
-        def grad_lag_xk(xk):
-            return grad_fun(xk) + np.dot(A, lambdak)
-        lambdak = grad_fix_step(grad_lag_xk, )
-        ##
+        def grad_lag(xk, lambdak):
+            return grad_fun(xk) + np.dot(A.T, lambdak)
+        def step_c(xk, lk, grad_f, grad_l, c, alpha=1e-2, maxit=1e3, eps=1e-8):
+            i = 0
+            grad_l_xk = grad_l(xk, lk)
+            while (i < maxit) and (grad_l_xk > eps):
+                grad_l_xk = grad_l(xk, lk)
+                xk = xk - alpha*grad_l_xk
+                for x in lambdak:
+                    x = min(O, x + alpha*c(xk))
     return xk
