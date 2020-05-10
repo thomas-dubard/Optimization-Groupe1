@@ -48,17 +48,17 @@ def cont2(x1, x2):
     c3 = [x2[i]* (1 - P_max/(x1[i] + x2[i])) for i in range(N)]
     return np.array(c1 + c2 + c3)
 
-def uzawa(xk1, xk2, grad_f1, grad_f2, grad_c1, grad_c2, c1, c2, epsilon=1e-2):
+def uzawa(xk1, xk2, grad_f1, grad_f2, grad_c1, grad_c2, c1, c2, epsilon=2.27):
     # 1 Initialisation
     lambdak = np.array([0]*(4*N + 2))
-    rho = 0.5
+    rho = 0.02001
     lambdaswap = [42]*(4*N + 2)
     compteur = 0
     while np.linalg.norm(lambdaswap - lambdak) > epsilon:
         compteur += 1
         print(f"itération {compteur} avec {xk1} et {xk2} ")
         # 2 Décomposition
-        lambdaswap = lambdak
+        lambdaswap = np.copy(lambdak)
         def decomp(xk, lk, grad_f, grad_c, alpha=1e-2, maxit=1e3, eps=1e-8):
             i = 0
             grad_l_xk = grad_f(xk) + np.dot(grad_c(xk), lk)
