@@ -39,7 +39,7 @@ def test_min(lamb):
             return False
     return True
 
-def contraintesactivesOQP(xk=P_0, lamb=[0]*(2*N + 1), W=W_0):
+def contraintesactivesOQP(xk=P_0, lambdak=[0]*(2*N + 1), W=W_0):
     """
     On implémente l'algorithme des contraintes actives QP.
     On est ici avec G=0, f(x)=x*c, c(x)=Ax-b
@@ -51,7 +51,8 @@ def contraintesactivesOQP(xk=P_0, lamb=[0]*(2*N + 1), W=W_0):
     Elle est telle que A*p=0, ce qui est garanti par notre choix simple.
     Elle minimise c*p.
     """
-    while not test_min(lamb):
+    while not test_min(lambdak):
+        xswap = xk
         # (a) direction pk
         pk = [0]*N
         indice = []
@@ -95,6 +96,19 @@ def contraintesactivesOQP(xk=P_0, lamb=[0]*(2*N + 1), W=W_0):
             while (i < maxit) and (grad_l_xk > eps):
                 grad_l_xk = grad_l(xk, lk)
                 xk = xk - alpha*grad_l_xk
-                for x in lambdak:
+                for x in lk:
                     x = min(O, x + alpha*c(xk))
+            return xk, lk
+        if pk == [O]*N:
+            xk, lambdak = step_c(xk, lambdak, grad_fun, grad_lag, cont)
+            for i in range(2*N + 1):
+                if not i in W:
+                    lambdak[i] = None
+            swap = 0, lambdak[0]
+            for i in range(len(lambdak)):
+                if lambdak[i] < swap[1]:
+                    swap = i, lambdak[i]
+            if swap[1] <= 0:
+                xk = xswap
+                W = [x for x in W if x != swap[0]]
     return xk
