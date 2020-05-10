@@ -7,11 +7,11 @@ import time
 On se place directement entre t_0 et t_f.
 Alors N correspond à l'échantillonage entre les deux.
 """
-N = 7
+N = 100
 U = 230.0
-c = np.array([1.0 for _ in range(N)]) # coût constant
+#c = np.array([1.0 for _ in range(N)]) # coût constant
 #c = np.array([2.0*(math.cos(i) + 1.1) for i in range(N)]) # coût oscillant
-#c = np.array([(2.0*(i%3) + 1.0) for i in range(N)])
+c = np.array([(2.0*(i%3) + 1.0) for i in range(N)]) # coût "triangulaire"
 Qf = 15.0
 Qi = 0.0
 t_f = 10.0
