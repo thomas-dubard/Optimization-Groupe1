@@ -7,22 +7,22 @@ import time
 On se place directement entre t_0 et t_f.
 Alors N correspond à l'échantillonage entre les deux.
 """
-N = 15
+N = 7
 U = 230.0
-#c = np.array([1.0 for _ in range(N)]) # coût constant
+c = np.array([1.0 for _ in range(N)]) # coût constant
 #c = np.array([2.0*(math.cos(i) + 1.1) for i in range(N)]) # coût oscillant
-c = np.array([(2.0*(i%3) + 1.0) for i in range(N)])
+#c = np.array([(2.0*(i%3) + 1.0) for i in range(N)])
 Qf = 15.0
 Qi = 0.0
 t_f = 10.0
 t_i = 0.0
-P_max = 40.0
-P_0 = [0.0*(Qf-Qi)/(t_f - t_i) * U/N]*N
-W_0 = set(range(0, 2*N + 1))
+P_max = 1.5*(Qf-Qi)/(t_f - t_i) * U
+P_0 = [(Qf-Qi)/(t_f - t_i) * U]*N
+W_0 = set([0])
 In_plus = [[0 if x!=k else 1 for x in range(N)] for k in range(N)]
 In_moins = [[0 if x!=k else -1 for x in range(N)] for k in range(N)]
 A = np.array([[-(t_f - t_i)/(N*U)]*N] + In_moins + In_plus)
-cst_pk = 2.0
+cst_pk = 0.1
 
 def fun(x):
     return np.dot(c, x)
@@ -41,11 +41,11 @@ def cont(x):
 
 def test_min(lamb):
     for l in lamb:
-        if l == None or l <= 0:
+        if l!=None and l <= 0.0:
             return False
     return True
 
-def contraintesactivesOQP(xk=P_0, lambdak=np.array([0]*(2*N + 1)), W=W_0):
+def contraintesactivesOQP(c, xk=P_0, lambdak=np.array([0.0]*(2*N + 1)), W=W_0):
     debut = time.time()
     """
     On implémente l'algorithme des contraintes actives QP.
@@ -59,7 +59,9 @@ def contraintesactivesOQP(xk=P_0, lambdak=np.array([0]*(2*N + 1)), W=W_0):
     Elle minimise c*p.
     """
     compteur = 0
-    while not test_min(lambdak) and compteur < N:
+    #compteur < (N-2)*(N-1)*N
+    #cont(xk)[0]<=0
+    while (not test_min(lambdak)) and all(y<=0.05 for y in cont(xk)):
         compteur += 1
         print(f"itération {compteur}, lambdak = {lambdak}")
         xswap = xk
@@ -195,8 +197,11 @@ def contraintesactivesOQP(xk=P_0, lambdak=np.array([0]*(2*N + 1)), W=W_0):
                     lambdaswap.append(lambdak[i])
             lambdak = np.array(lambdaswap)
     fin = time.time()
-    print(f"ça a pris {fin - debut} secondes pour N={N} !")
-    plt.plot(list(range(N)), xk, color='red')
+    print(f"ça a pris {fin - debut} secondes pour N={N}, cont={cont(xk)} !")
+    c = [x*(np.mean(xk)/np.mean(c)) for x in c]
+    plt.plot(list(range(N)), xswap, color='red')
     plt.plot(list(range(N)), c, color='blue')
+    plt.plot(list(range(N)), [P_max]*N, color='green')
+    plt.plot(list(range(N)), P_0, color='yellow')
     plt.show()
-    return xk
+    return xswap
