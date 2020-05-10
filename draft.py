@@ -2,24 +2,27 @@ import matplotlib.pyplot as plt
 import numpy as np
 import random
 import math
+import time
 """
 On se place directement entre t_0 et t_f.
 Alors N correspond à l'échantillonage entre les deux.
 """
-N = 20
+N = 15
 U = 230.0
 #c = np.array([1.0 for _ in range(N)]) # coût constant
-c = np.array([2.0*(math.cos(i) + 1.1) for i in range(N)]) # coût oscillant
+#c = np.array([2.0*(math.cos(i) + 1.1) for i in range(N)]) # coût oscillant
+c = np.array([(2.0*(i%3) + 1.0) for i in range(N)])
 Qf = 15.0
 Qi = 0.0
 t_f = 10.0
 t_i = 0.0
-P_max = 500.0
-P_0 = [(Qf-Qi)/(t_f - t_i) * U/N]*N
-W_0 = list(range(0, 2*N + 1))
+P_max = 40.0
+P_0 = [0.0*(Qf-Qi)/(t_f - t_i) * U/N]*N
+W_0 = set(range(0, 2*N + 1))
 In_plus = [[0 if x!=k else 1 for x in range(N)] for k in range(N)]
 In_moins = [[0 if x!=k else -1 for x in range(N)] for k in range(N)]
 A = np.array([[-(t_f - t_i)/(N*U)]*N] + In_moins + In_plus)
+cst_pk = 2.0
 
 def fun(x):
     return np.dot(c, x)
@@ -43,6 +46,7 @@ def test_min(lamb):
     return True
 
 def contraintesactivesOQP(xk=P_0, lambdak=np.array([0]*(2*N + 1)), W=W_0):
+    debut = time.time()
     """
     On implémente l'algorithme des contraintes actives QP.
     On est ici avec G=0, f(x)=x*c, c(x)=Ax-b
@@ -55,29 +59,72 @@ def contraintesactivesOQP(xk=P_0, lambdak=np.array([0]*(2*N + 1)), W=W_0):
     Elle minimise c*p.
     """
     compteur = 0
-    while not test_min(lambdak) and compteur<20:
+    while not test_min(lambdak) and compteur < N:
         compteur += 1
-        print(f"itération {compteur}")
+        print(f"itération {compteur}, lambdak = {lambdak}")
         xswap = xk
         # (a) direction pk
         print("a")
         pk = [0]*N
         indice = []
         for i in W:
-            if 0 < i <= N:
-                indice.append(i)
+            if 1 < i <= N:
+                indice.append(i - 1)
             else:
-                indice.append(i - N)
+                indice.append(i - N - 1)
         indice = set(indice)
-        if len(indice) < N - 1:
+        if len(indice) < N - 3 and 0 in W:
             liste = [x for x in range(N) if not x in indice]
             i1 = random.randint(0, len(liste)-1)
             y1 = liste.pop(i1)
             i2 = random.randint(0, len(liste)-1)
             y2 = liste.pop(i2)
-            pk[y1], pk[y2] = c[y2], -c[y1]
+            i3 = random.randint(0, len(liste)-1)
+            y3 = liste.pop(i3)
+            sens = 2*random.randint(0, 1) - 1
+            if c[y1] != c[y2]:
+                pk[y1] = sens*(c[y2] - c[y3])/(c[y1] - c[y2])
+                pk[y2] = sens*(c[y1] - c[y3])/(c[y2] - c[y1])
+                pk[y3] = sens*1
+            else:
+                pk[y1] = 0
+                pk[y2] = -sens
+                pk[y3] = sens
             # (b) pk != 0
             # légitime car coût non nul à tout instant
+            norm_pk = (sum(x**2 for x in pk))**0.5
+            pk = [x/(cst_pk*norm_pk) for x in pk]
+            print(f"b : pk={pk}, W={W}")
+            swap = [1] + [None]*(2*N + 1)
+            if not 0 in W and pk[y1] + pk[y2] + pk[y3] < 0:
+                z = (Qi - Qf + (t_f - t_i)*sum(y for y in xk)/(N * U))
+                swap[1] = (-z/(t_f - t_i)*(pk[y1] + pk[y2] + pk[y3])/(N * U))
+            for i in range(1, N+1):
+                if not i in W and pk[i-1] < 0:
+                    swap[i+1] = (-xk[i-1]/pk[i-1])
+                if not (i+N) in W and pk[i-1] > 0:
+                    swap[i+1] = (xk[i-1]/pk[i-1])
+            alphak = min(x for x in swap if x != None)
+            xk = np.array([xk[i] + alphak * pk[i] for i in range(N)])
+            if alphak < 1:
+                j = 0
+                while swap[j] != alphak:
+                    j += 1
+                W.add(j)
+            print(f"xk={xk}, W={W}")
+        elif len(indice) < N - 2 and not 0 in W:
+            liste = [x for x in range(N) if not x in indice]
+            i1 = random.randint(0, len(liste)-1)
+            y1 = liste.pop(i1)
+            i2 = random.randint(0, len(liste)-1)
+            y2 = liste.pop(i2)
+            sens = 2*random.randint(0, 1) - 1
+            pk[y1] = sens*c[y2]
+            pk[y2] = -sens*c[y1]
+            # (b) pk != 0
+            # légitime car coût non nul à tout instant
+            norm_pk = (sum(x**2 for x in pk))**0.5
+            pk = [x/(cst_pk*norm_pk) for x in pk]
             print(f"b : pk={pk}, W={W}")
             swap = [1] + [None]*(2*N + 1)
             if not 0 in W and pk[y1] + pk[y2] < 0:
@@ -94,7 +141,7 @@ def contraintesactivesOQP(xk=P_0, lambdak=np.array([0]*(2*N + 1)), W=W_0):
                 j = 0
                 while swap[j] != alphak:
                     j += 1
-                W.append(j)
+                W.add(j)
             print(f"xk={xk}, W={W}")
         # (c) pk = 0
         def grad_lag(xk, lambdak):
@@ -110,7 +157,12 @@ def contraintesactivesOQP(xk=P_0, lambdak=np.array([0]*(2*N + 1)), W=W_0):
                 c_xk = c(xk)
                 for j in range(len(lk)):
                     if j in W:
-                        lk[j] = min(0, lk[j] + alpha*c_xk[j])
+                        if lk[j] != None:
+                            lk[j] = min(0, lk[j] + alpha*c_xk[j])
+                        else:
+                            lk[j] = min(0, alpha*c_xk[j])
+                    else:
+                        lk[j] = None
             return xk, lk
         if pk == [0]*N:
             print(f"c : pk={pk}")
@@ -133,8 +185,17 @@ def contraintesactivesOQP(xk=P_0, lambdak=np.array([0]*(2*N + 1)), W=W_0):
                     swap = i, lambdak[i]
             if swap[1] <= 0:
                 xk = xswap
-                W = [x for x in W if x != swap[0]]
+                W = set(x for x in W if x != swap[0])
             print(f"xk={xk}, W={W}")
+            lambdaswap = []
+            for i in range(2*N + 1):
+                if not i in W:
+                    lambdaswap.append(None)
+                else:
+                    lambdaswap.append(lambdak[i])
+            lambdak = np.array(lambdaswap)
+    fin = time.time()
+    print(f"ça a pris {fin - debut} secondes pour N={N} !")
     plt.plot(list(range(N)), xk, color='red')
     plt.plot(list(range(N)), c, color='blue')
     plt.show()
