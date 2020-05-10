@@ -7,25 +7,28 @@ import time
 """
 On se place directement entre t_0 et t_f.
 Alors N correspond à l'échantillonage entre les deux.
+Dans cette étude, le coût et le nombre de points sont déterminants.
+En effet, ils influent beaucoup sur le temps d'éxécution.
 """
 
-
+##On choisit le profil temporel de coût de l'électricité
 #c = np.array([1.0 for _ in range(N)]) # coût constant
 #c = np.array([2.0*(math.cos(i) + 1.1) for i in range(N)]) # coût oscillant
 c = np.array([(2.0*(i%3) + 1.0) for i in range(N)]) # coût "triangulaire"
 
-
+##On fixe le nombre de points de la discrétisation
 N = 100
 
-
+##On fixe toutes les constantes du problème conformément aux OdG
 U = 230.0
 Qf = 15.0
 Qi = 0.0
 t_f = 10.0
 t_i = 0.0
-P_max = 1.5*(Qf-Qi)/(t_f - t_i) * U
+P_max = 1.5*(Qf-Qi)/(t_f - t_i) * U #on triche un peu ...
 P_0 = [(Qf-Qi)/(t_f - t_i) * U]*N
 W_0 = set([0])
+#On implémente la matrice des contraintes
 In_plus = [[0 if x!=k else 1 for x in range(N)] for k in range(N)]
 In_moins = [[0 if x!=k else -1 for x in range(N)] for k in range(N)]
 A = np.array([[-(t_f - t_i)/(N*U)]*N] + In_moins + In_plus)
@@ -58,14 +61,23 @@ def contraintesactivesOQP(c, xk=P_0, lambdak=np.array([0.0]*(2*N + 1)), W=W_0):
     debut = time.time()
     """
     On implémente l'algorithme des contraintes actives QP.
+    On part du profil de puissance constante.
     On est ici avec G=0, f(x)=x*c, c(x)=Ax-b
     où A=(-T/NU ... -T/NU) et b=(Qi - Qf)
          (     -In       )      (   0   )
          (      In       )      (  Pmax )
     Dans l'étape (a) on cherche une direction pour la recherche.
-    On la choisit aléatoirement.
+    On la choisit aléatoirement selon un protocole préétabli.
     Elle est telle que A*p=0, ce qui est garanti par notre choix simple.
     Elle minimise c*p.
+    Dans l'étape (b) on va ensuite traiter le cas où la direction est non nulle.
+    D'abord on calcule alpha à partir des contraintes.
+    Puis on va (ou non) ajouter une contrainte à l'ensemble de travail.
+    Cette étape est opérée en fonction du résultat de l'étape (a).
+    Dans l'étape (c) on traite le cas où pk est nulle.
+    On va mettre à jour les multiplicateurs de Lagrange.
+    Pour cela on utilise un gradient à pas constant.
+    Puis on élimine le plus petit.
     """
     compteur = 0
     #compteur < (N-2)*(N-1)*N
@@ -77,6 +89,7 @@ def contraintesactivesOQP(c, xk=P_0, lambdak=np.array([0.0]*(2*N + 1)), W=W_0):
         # (a) direction pk
         print("a")
         pk = [0]*N
+        #On regarde quels indices sont bloqués par les contraintes.
         indice = []
         for i in W:
             if 1 < i <= N:
@@ -85,6 +98,7 @@ def contraintesactivesOQP(c, xk=P_0, lambdak=np.array([0.0]*(2*N + 1)), W=W_0):
                 indice.append(i - N - 1)
         indice = set(indice)
         if len(indice) < N - 3 and 0 in W:
+            #Cf preuve après.
             liste = [x for x in range(N) if not x in indice]
             i1 = random.randint(0, len(liste)-1)
             y1 = liste.pop(i1)
